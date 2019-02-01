@@ -1,5 +1,5 @@
 from Start import *
 
-print("Running")
+print "Running"
 window = PlanWin()
 print(window)

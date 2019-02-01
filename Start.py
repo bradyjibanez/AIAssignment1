@@ -6,22 +6,22 @@
  uses a bounding box to ignore nodes outside the region, should be safe
 '''
 
-from tkinter import *
+from Tkinter import *
 import struct
 import xml.etree.ElementTree as ET
-from queue import *
+from Queue import *
 import math
 
 # bounds of the window, in lat/long
-LEFTLON = 18.055
-RIGHTLON = 18.125
-TOPLAT = 42.675
-BOTLAT = 42.635
+LEFTLON = -78.9357000
+RIGHTLON = -78.8118000
+TOPLAT = 43.9921000
+BOTLAT = 43.8494000
 WIDTH = RIGHTLON-LEFTLON
 HEIGHT = TOPLAT-BOTLAT
 # ratio of one degree of longitude to one degree of latitude 
 LONRATIO = math.cos(TOPLAT*3.1415/180)
-WINWID = 800
+WINWID = 500
 WINHGT = (int)((WINWID/LONRATIO)*HEIGHT/WIDTH)
 TOXPIX = WINWID/WIDTH
 TOYPIX = WINHGT/HEIGHT
@@ -152,7 +152,7 @@ class PlanWin(Frame):
         # row is 0 for 43N, 1201 (EPIX) for 42N
         row = (int)((43 - latlon[0]) * EPIX)
         # col is 0 for 18 E, 1201 for 19 E
-        col = (int)((latlon[1]-18) * EPIX)
+        col = (int)((latlon[1]-80) * EPIX)
         return self.elevs[row*EPIX+col]
 
     def maphover(self,event):
@@ -285,7 +285,7 @@ def build_elevs(efilename):
 
 def build_graph(elevs):
     ''' Build the search graph from the OpenStreetMap XML. '''
-    tree = ET.parse('dbv.osm') #HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    tree = ET.parse('Oshawa.osm') #HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!
     root = tree.getroot()
 
     nodes = dict()
@@ -305,7 +305,7 @@ def build_graph(elevs):
                 el = 0
             nodes[(long)(item.get('id'))] = Node((long)(item.get('id')),coords,el)            
         elif item.tag == 'way':
-            if item.get('id') == '157161112': #main coastline way ID
+            if item.get('id') == '4055035': #main coastline way ID
                 for thing in item:
                     if thing.tag == 'nd':
                         coastnodes.append((long)(thing.get('ref')))
@@ -346,7 +346,7 @@ def build_graph(elevs):
     print(nodes[coastnodes[0]])
     return nodes, ways, coastnodes
 
-elevs = build_elevs("N43W080.HGT")
+elevs = build_elevs("N43W080.hgt")
 nodes, ways, coastnodes = build_graph(elevs)
 
 master = Tk()
