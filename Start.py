@@ -26,7 +26,7 @@ WINHGT = (int)((WINWID/LONRATIO)*HEIGHT/WIDTH)
 TOXPIX = WINWID/WIDTH
 TOYPIX = WINHGT/HEIGHT
 #width,height of elevation array
-EPIX = 3601
+EPIX = 1201
 # approximate number of meters per degree of latitude
 MPERLAT = 111000
 MPERLON = MPERLAT*LONRATIO
@@ -153,7 +153,8 @@ class PlanWin(Frame):
         row = (int)((43 - latlon[0]) * EPIX)
         # col is 0 for 18 E, 1201 for 19 E
         col = (int)((latlon[1]-80) * EPIX)
-        return self.elevs[row*EPIX+col]
+        elev = self.elevs.append(row*EPIX+col)
+        return elev
 
     def maphover(self,event):
         self.elab.configure(text = str(self.pix_to_elev(event.x,event.y)))
