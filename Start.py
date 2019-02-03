@@ -150,10 +150,11 @@ class PlanWin(Frame):
 
     def lat_lon_to_elev(self,latlon):
         # row is 0 for 43N, 1201 (EPIX) for 42N
-        row = (int)((43 - latlon[0]) * EPIX)
+        row = abs((int)((43 - latlon[0]) * EPIX))
         # col is 0 for 18 E, 1201 for 19 E
-        col = (int)((latlon[1]-80) * EPIX)
-        elev = self.elevs.append(row*EPIX+col)
+        col = abs((int)((latlon[1]-80) * EPIX))
+        #elev = self.elevs.append(row*EPIX+col)
+        elev = row*EPIX+col
         return elev
 
     def maphover(self,event):
