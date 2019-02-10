@@ -1,9 +1,7 @@
 '''
- A*, path planner solution
-
-
- note xml includes all nodes for all partially-present ways
- uses a bounding box to ignore nodes outside the region, should be safe
+ A*, path planner including elevation heuristic considerations
+Brady Ibanez - 100367230
+Check functions at lines 42, 96, and modifications at line 160 for elevation considerations. 
 '''
 
 from Tkinter import *
@@ -30,12 +28,19 @@ EPIX = 1201
 # approximate number of meters per degree of latitude
 MPERLAT = 111000
 MPERLON = MPERLAT*LONRATIO
+elevDiffPrior = 0
+distPrior = 0
 
 def node_dist(n1, n2):
     ''' Distance between nodes n1 and n2, in meters. '''
     dx = (n2.pos[0]-n1.pos[0])*MPERLON
     dy = (n2.pos[1]-n1.pos[1])*MPERLAT
     return math.sqrt(dx*dx+dy*dy) # in meters
+
+#Used to find difference in elevation between two immediately oriented nodes
+#in path
+def node_elev_diff(n1, n2):
+    return n2.elev - n1.elev
  
 class Node():
     ''' Graph (map) node, not a search node! '''
@@ -90,33 +95,73 @@ class Planner():
 
     def heur(self,node,gnode):
         '''
-        Heuristic function is just straight-line (flat) distance.
-        Since the actual cost only adds to this distance, this is admissible.
+        Modified heuristic to allow for inference to elivation implication.
+        Will only accept node routes (ways) when elevation between to nodes
+        is equal or less than. Not too much of a difference seen on shorter
+        routes. abs value of elevDiff calculated since only difference is
+        necessary to be found. 
         '''
-        return node_dist(node,gnode)
+        global elevDiffPrior
+        global distPrior
+        elevDiff = abs(node_elev_diff(node, gnode))
+        Dist = node_dist(node,gnode)
+
+        if elevDiff < elevDiffPrior:
+            elevDiffLeast = elevDiff
+            distPrior = Dist 
+            elevDiffPrior = elevDiff
+
+        elif elevDiff == elevDiffPrior:
+            distPrior = Dist
+            elevDiffPrior = elevDiff 
+        
+        elif elevDiff > elevDiffPrior:
+            #return a 0 solely for Tkinter to maintain values for possible
+            #ways. 0's never used so no concern about possible inaccuracy.
+            #Elevation exceptions printed for ALL ways not equal or lesser
+            #elevation. Checks ENTIRE map of Oshawa, so lots might print
+            #depending on how many nodes are branched to from all nodes in
+            #path.
+            print("***Elevation exception required***")
+            elevDiffPrior = elevDiff
+            return int(0)
+        
+        if Dist == distPrior:
+            return distPrior
     
-    def plan(self,s,g):
-        '''
-        Standard A* search
-        '''
+    def Astar(self,s,g):
+
+        #s is startnode
+        #g is goalnode
         parents = {}
         costs = {}
-        q = PriorityQueue()
-        q.put((self.heur(s,g),s))
+        dQ = PriorityQueue()
+        #appends paths to destination queue depending on distance and elevation
+        dQ.put((self.heur(s,g),s))
         parents[s] = None
         costs[s] = 0
-        while not q.empty():
-            cf, cnode = q.get()
+        while not dQ.empty():
+            cf, cnode = dQ.get()
             if cnode == g:
-                print ("Path found, time will be",costs[g]*60/5000) #5 km/hr on flat
+                print " "
+                print "Path found and it will cost approx.",int(costs[g]*60/5000),"minutes walking at 5km/hr."                
+                print " "
+                print "You will need to take the following streets:"
+                print " "
                 return self.make_path(parents,g)
             for edge in cnode.ways:
                 newcost = costs[cnode] + edge.cost
                 if edge.dest not in parents or newcost < costs[edge.dest]:
                     parents[edge.dest] = (cnode, edge.way)
                     costs[edge.dest] = newcost
-                    q.put((self.heur(edge.dest,g)+newcost,edge.dest))
-
+                    #None value indicates higher elevation, don't call .put()
+                    #becase will cause Tkinter error. Also not necessary to
+                    #reference null ways
+                    if self.heur(edge.dest,g) is None:
+                        pass
+                    else:
+                        dQ.put((self.heur(edge.dest,g)+newcost,edge.dest))
+        
     def make_path(self,par,g):
         nodes = []
         ways = []
@@ -156,7 +201,7 @@ class PlanWin(Frame):
         #elev = self.elevs.append(row*EPIX+col)
         elev = row*EPIX+col
         return elev
-
+        
     def maphover(self,event):
         self.elab.configure(text = str(self.pix_to_elev(event.x,event.y)))
         for (dx,dy) in [(0,0),(-1,0),(0,-1),(1,0),(0,1),(-1,-1),(-1,1),(1,-1),(1,1)]:
@@ -175,7 +220,7 @@ class PlanWin(Frame):
         ''' Canvas click handler:
         First click sets path start, second sets path goal 
         '''
-        print("Clicked on" +str(event.x)+","+str(event.y)+" last node "+str(self.lastnode))
+        print("Point selected")
         if self.lastnode is None:
             return
         if self.startnode is None:
@@ -199,11 +244,12 @@ class PlanWin(Frame):
     def plan_path(self):
         ''' Path button callback, plans and then draws path.'''
         print("Planning!")
+        print(" ")
         if self.startnode is None or self.goalnode is None:
             print("Sorry, not enough info.")
             return
-        print ("From", self.startnode.id, "to", self.goalnode.id)
-        nodes,ways = self.planner.plan(self.startnode, self.goalnode)
+        print "From OSM point", self.startnode.id, "to OSM point", self.goalnode.id
+        nodes,ways = self.planner.Astar(self.startnode, self.goalnode)
         lastway = ""
         for wayname in ways:
             if wayname != lastway:
@@ -214,7 +260,6 @@ class PlanWin(Frame):
             npos = self.lat_lon_to_pix(node.pos)
             coords.append(npos[0])
             coords.append(npos[1])
-            #print node.id
         self.canvas.coords('path',*coords)
         
     def __init__(self,master,nodes,ways,coastnodes,elevs):
@@ -287,7 +332,7 @@ def build_elevs(efilename):
 
 def build_graph(elevs):
     ''' Build the search graph from the OpenStreetMap XML. '''
-    tree = ET.parse('Oshawa.osm') #HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    tree = ET.parse('Oshawa.osm')
     root = tree.getroot()
 
     nodes = dict()
@@ -343,13 +388,12 @@ def build_graph(elevs):
                         nodes[thisn].ways.append(Edge(ways[wayid],nodes[thisn],nodes[nextn]))
                         thisn = nextn                
                 ways[wayid].nodes = nlist
-    print(len(coastnodes))
-    print(coastnodes[0])
-    print(nodes[coastnodes[0]])
     return nodes, ways, coastnodes
 
 elevs = build_elevs("N43W080.hgt")
 nodes, ways, coastnodes = build_graph(elevs)
+#coastnodes draw lake and water bodies
+#ways 
 
 master = Tk()
 thewin = PlanWin(master,nodes,ways,coastnodes,elevs)
